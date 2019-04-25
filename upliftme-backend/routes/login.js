@@ -1,14 +1,22 @@
+/*what does this do is, when the user clicks into the router page "/login", redirected to spotify authentication,
+application sent a http post request to spotify to accesss data, spotify returned access token
+in the new design, data would only be pulled into the mongodb once to pretect the accessibility of the access token,
+so at the initial login, if the db is empty, pour data of songs into it, filter out the valid song, built a "returnarray" to store the songs details
+in json format.
+logger endpoint - gets data from spotify
+login endpoint - redirected to the spotify page to ask user for confirmation about login and redirected user to logger*/
+
 const express = require('express');
 const router = express.Router();
-let Happy = require('../models/happyTrack');  //Happy model from models.
-let Angry = require('../models/angryTrack');  // Angry Model from models, and so on.
+let Happy = require('../models/happyTrack');
+let Angry = require('../models/angryTrack');
 const fetch = require('node-fetch');
 let Sad = require('../models/sadTrack');
 let Chill = require('../models/chillTrack');
 
 request = require('request')
 
-/* Initialization of few arguments that are used later on*/
+//querystring is used to retrieve the query variables in the http query string
 let querystring = require('querystring')
 let uri = 'http://localhost:3000';
 let redirect_uri = 'http://localhost:8888/logger';
@@ -16,7 +24,7 @@ var N = 500; // max size of playlist to be rendered on screen //Return here: Cha
 const TARGET_PLAYLIST_SIZE = 50;
 
 // The endpoint 'login' listens for requests on the backend, when invoked
-// with ,localhost:8888/login this get method gets invoked.
+// with localhost:8888/login this get method gets invoked.
 
 router.get('/login', function(req,res){
   res.redirect('https://accounts.spotify.com/authorize?' +
@@ -25,9 +33,9 @@ router.get('/login', function(req,res){
       client_id: process.env.SPOTIFY_CLIENT_ID,
       scope: 'user-read-private user-read-email',
       redirect_uri
-    }))
-})
-
+    })
+    );
+});
 // As soon as we are done authenticating, spotify redirects us to the redirect redirect_uri
 // This is the second redirect_uri inside the https://developer.spotify.com app. First redirect redirect_uri
 // is 'iamhome'. This one is called 'logger'
@@ -37,6 +45,8 @@ var data_ret;
 var tracks_ret;
 var happy_list;
 
+//https://developer.spotify.com/documentation/general/guides/authorization-guide/
+//application request access to the spotify
 router.get('/logger', function(req, res) {
   console.log('====/Logger called!====');
   let code = req.query.code || 'shit'
@@ -55,22 +65,24 @@ router.get('/logger', function(req, res) {
     },
     json: true
   }
+  //authOptions is attached to this http post request
   request.post(authOptions, function(error, response, body) {
-    access_token = body.access_token   // Store the access token in the access_token variable.
+    access_token = body.access_token
     console.log('Access token: ',access_token);
 
     // Store the value from the database model.
     // In the method below we are checking if Happy model's collection is 0 .
     // If it is greater than 0 return, if not authenticate with spotify.
-    var count=0; //Return here: This count variable is never used. Why is it here?
+    var count=0; //Return here: This count variable is never used.
 
+    //Happy is a mongodb schema
     Happy.count().exec((err, counter) => {
       console.log('The number of elements in the Happy collection is: ',counter);
       if (counter >0) {
         count = counter;
         return;
       }
-      else{ populateDatabase('happy');} //else statement ends here
+      else{ populateDatabase('happy');}
     });
 
     Angry.count().exec((err, counter) => {
@@ -79,7 +91,7 @@ router.get('/logger', function(req, res) {
         count = counter;
         return;
       }
-      else{ populateDatabase('angry');  } //else statement ends here
+      else{ populateDatabase('angry');  }
     });
 
     Sad.count().exec((err, counter) => {
@@ -88,7 +100,7 @@ router.get('/logger', function(req, res) {
         count = counter;
         return;
       }
-      else{ populateDatabase('sad');  } //else statement ends here
+      else{ populateDatabase('sad');  }
     });
 
     Chill.count().exec((err, counter) => {
@@ -97,12 +109,23 @@ router.get('/logger', function(req, res) {
         count = counter;
         return;
       }
-      else{ populateDatabase('chill');  } //else statement ends here
+      else{ populateDatabase('chill');  }
     });
 
-      // Once populate is done or once the database size has been confirmed to be greater than 0
-      // Redirect to the front end.
-    res.redirect(uri);
+//get user profile
+let opt = {
+	//I will update here
+      url: "",
+      //generally common way for sending access token to api, mostly access token has to be provided for requests.
+      headers: { Authorization: "Bearer " + access_token }
+    };
+    //requesting for profile
+    request.get(opt, async (err, respoo) => {
+      //if error show error
+      if (err) {
+        console.log("ERROR while viewing profile : ", err);
+        res.redirect(uri);
+      }
   })
 })
 
@@ -136,8 +159,10 @@ function populateDatabase(mood)
     .then(response => response.json())
     .then((tracks) =>{
         tracks_ret = tracks;
+        //remove some un-itemized track
         list_mood=pruneTracksList(tracks_ret);
         //console.log("We are printing it here");
+        //
         final_list = buildTracksJson(list_mood);
         //console.log(list_mood);
         //console.log(final_list);
@@ -228,6 +253,7 @@ function buildTracksJson(list)
   for(var i=0;i<size;i++)
   {
     var artists=[];
+    //get names into artists
     for(var j=0;j<list[i].track.artists.length;j++)
     {
       artists.push(list[i].track.artists[j].name);
@@ -295,6 +321,7 @@ function chooseNSongs(n, list){
       range--;
       //Remove chosen song at this index and add to list of chosen songs
     //  console.log('**List before splice: ',list);
+    //the list after removal
       let arrayWithRemovedValue = list.splice(indexOfRandomTrack,1);
     //  console.log('**List after splice: ', list);
 
@@ -330,15 +357,6 @@ function findLargePlaylist(list)
     }
 
     return largestPlaylistIndex;
-
-    //If no playlists of size TARGET_PLAYLIST_SIZE, return index of largest playlist
-    // if(largePlaylistCounter === 0){
-    //   return largestPlaylist;
-    // }
-    // else{
-    //   var randomIndex = generateRandomNumber(0,largePlaylistCounter-1);
-    //   return randomIndex;
-    // }
 }
 
 function generateRandomNumber(min,max_inclusive)
@@ -346,6 +364,7 @@ function generateRandomNumber(min,max_inclusive)
   return Math.floor(Math.random()*(max_inclusive-min+1)+min);
 }
 
+//dictionary
 function processTrack(trackItem){
 
        //let image = trackItem.track.album.images[0].url;
