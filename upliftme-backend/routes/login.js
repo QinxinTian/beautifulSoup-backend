@@ -3,7 +3,7 @@ application sent a http post request to spotify to accesss data, spotify returne
 in the new design, data would only be pulled into the mongodb once to pretect the accessibility of the access token,
 so at the initial login, if the db is empty, pour data of songs into it, filter out the valid song, built a "returnarray" to store the songs details
 in json format.
-logger endpoint - gets data from spotify
+logger endpoint - spotify uses a redirected_url to contact the backend
 login endpoint - redirected to the spotify page to ask user for confirmation about login and redirected user to logger*/
 
 const express = require('express');
@@ -126,6 +126,23 @@ let opt = {
         console.log("ERROR while viewing profile : ", err);
         res.redirect(uri);
       }
+      if (respoo) {
+        let body = respoo.body;
+        body = JSON.parse(body)
+        let name = body.display_name;
+        let email = body.email;
+        let image = body.images[0].url;
+        //create user if doesn't exists
+        let user_detail = await User.findOne({ email });
+        if (user_detail === null) {
+          await new User({
+            email,
+            name,
+            image,
+            date: new Date()
+            //mongoose function
+          }).save();
+        }
   })
 })
 
