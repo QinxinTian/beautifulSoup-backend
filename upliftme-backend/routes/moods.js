@@ -1,3 +1,9 @@
+/*when we reached the generatedhhappy endpoint, return a playlist that is found in db, send json back via res.send(), if nothing is found,
+invoke the generatehappy function, which is selected 10 songs randomly from raw db, the 10 songs was initially sorted at the intial selection
+according to their probabilitypoint, and its shuffle the songs then return this songlist, same as other moods for the behavior of liking a song
+in a specific mood, send put request to updated the song's score by looping through all entries in data array looking for provided id, When found,
+check probability point value and the val which is used to keep track of how much points we need to decrease or increase while made sure
+it won't be past 10, and update its point to db, same as liking song for other mood. */
 const express = require('express');
 const router = express.Router();
 const HappyTrack = require('../models/happyTrack');
@@ -10,11 +16,15 @@ var N = 10; //Number of tracks to pass to front end
 let mood = '';
 let uri = 'http://localhost:3000';
 
-
+//adding middleware
 router.use(function(req, res, next) {
+  //the website that we want to connect
   res.header('Access-Control-Allow-Origin', '*');
+  //the method we want to allow
   res.header('Access-Control-Allow-Methods', 'PUT, GET, POST, DELETE, OPTIONS');
+  //the headers we want to follow
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  //pass to next layer of express middleware
   next();
 });
 
@@ -79,14 +89,16 @@ router.get('/generateChill', function(req,res){
 
 
 
-
+//change points of the liked song
 
 //Routes to update tracks in database (to mark as removed by setting available to false)
 router.put('/like/happyTracks/:id/:val',function(req,res,next){
+  //send param in endpoint, risky
   var id = req.params.id;
   // console.log('id is: ',id);
   var val = req.params.val;
   console.log('val is: ',val);
+  //save in doc
   HappyTrack.find({},function(err,doc){
     if(err) throw err;
     //Loop through all entries in data array looking for provided id
@@ -97,6 +109,7 @@ router.put('/like/happyTracks/:id/:val',function(req,res,next){
     var probValue = -1;
     for(var i=0; i<doc[0].data.length;i++){
       // console.log('_id found: ',doc[0].data[i]._id);
+      //single dict
       if(id===doc[0].data[i]._id){
         // console.log('*InPost: FOUND ID in db!');
         probValue = doc[0].data[i].probability;
@@ -104,6 +117,7 @@ router.put('/like/happyTracks/:id/:val',function(req,res,next){
         // console.log('*InPost: thisProbValue is: ',probValue);
         if(probValue<10){
           indexOfUpdate=i;
+          //less than 10
           if(val==='2'&&probValue<9){
             doc[0].data[i].probability = probValue+2;
             doc[0].data[0].artist = doc[0].data[0].artist+2;
@@ -213,6 +227,7 @@ router.put('/like/chillTracks/:id/:val',function(req,res,next){
       _id: new ObjectID(doc[0]._id)
     };
     // console.log('docZeroID: ',docZeroID);
+    //?
     if(indexOfUpdate!==-1){
       ChillTrack.update({_id:docZeroID},{data:doc[0].data},(err,results)=>{
         if(err) throw err;
@@ -479,11 +494,9 @@ function generateTrackList(docs){
   collectionEntry = getCollectionEntry(docs);
   // console.log('collectionEntry: ',collectionEntry);
 
-  //Identify the total_prob_points in the entry
   total_prob_points = collectionEntry[0].artist;
   // console.log('total_prob_points: ',total_prob_points);
 
-  //Generate sorted list of N random numbers between 1 and total_prob_points (inclusive)
   let randomNumberSet = new Set();
   // console.log('ValueOfN: ',N);
   // console.log('sizeOfRandomNumberSet: ',randomNumberSet.size);
@@ -492,16 +505,16 @@ function generateTrackList(docs){
     // console.log('curRandNumSet: ',randomNumberSet.keys);
   }
   // console.log('randomNumberSet: ',randomNumberSet);
+
+  //create a new, shallowed copied array instance
   let probabilityPointArray = Array.from(randomNumberSet);
   // console.log('probabilityPointArray: ',probabilityPointArray);
   probabilityPointArray.sort(function(a,b){return a-b});
   // console.log('probabilityPointArray_SORTED: ',probabilityPointArray);
 
 
-  //Initialize running total points encountered
   runningProbPointTotal = 0;
 
-  //Initialize trackList
   var trackList = [];
 
   //For each track in collectionEntry:

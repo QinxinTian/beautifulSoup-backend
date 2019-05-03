@@ -143,8 +143,14 @@ let opt = {
             //mongoose function
           }).save();
         }
-  })
-})
+//reflect in the front end about the page after login.
+        res.redirect(`http://localhost:3000/logged-in?email=${email}&name=${name}&image=${image}`)
+
+      }
+    });
+
+      });
+});
 
  // The one function that populates the database, takes in mood as a string.
 function populateDatabase(mood)
